@@ -103,7 +103,7 @@ int main(int argc, char * argv[]){
     pthread_t resolver_threads[1];
     void* status;//stackoverflow
     for (long i = 0; i < numberofinputfiles; i++){
-        pthread_create(&requester_threads[i], NULL, readUrl, (void *)argv[i+1]);
+        pthread_create(&requester_threads[i], NULL, readURL, (void *)argv[i+1]);
     }//moving on to the next file
     for (long i = 0; i < 1; i++){
         pthread_create(&resolver_threads[i], NULL, resolve, (void *)argv[argc-1]);
