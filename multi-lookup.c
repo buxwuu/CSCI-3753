@@ -55,7 +55,6 @@ void *readURL(void *file){
 }
 
 void* resolve(void* outputFile) {
-    char* hostname;
     char firstipstr[INET6_ADDRSTRLEN];
     
     /* Open Output File */
@@ -66,8 +65,10 @@ void* resolve(void* outputFile) {
         return NULL;
     }
     while(1){
+    	char* hostname;
         pthread_mutex_lock(&lock);
-        hostname = queue_pop(&request);
+        hostname = (char*)queue_pop(&request);
+        printf("%s\n", hostname);
         pthread_mutex_unlock(&lock);
         
         if (hostname != NULL) {
@@ -77,17 +78,13 @@ void* resolve(void* outputFile) {
                 strncpy(firstipstr, "", sizeof(firstipstr));
             }
             pthread_mutex_lock(&lock);
+            printf("%s\n", hostname);
             fprintf(outputfp, "%s,%s\n", hostname, firstipstr);
             pthread_mutex_unlock(&lock);
-            
-            free(hostname);
-            
-            
+            //free(hostname);
         }
         
-        
     }
-    free(hostname);
     fclose(outputfp);
     return NULL;
 }
@@ -130,4 +127,3 @@ int main(int argc, char * argv[]){
     printf("Main: program completed.\n");
     return 0;
 }
-
