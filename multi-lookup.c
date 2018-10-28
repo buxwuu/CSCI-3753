@@ -19,10 +19,10 @@ void *readURL(void *file){
     FILE* inputfp = NULL;
     int fail;
     char* hostname = malloc(SBUFSIZE*sizeof(char));
-    if (hostname == NULL){
+    /*if (hostname == NULL){
         printf("Memory allocation failed.\n");
-    }
-    inputfp = fopen((char* )file, "r");
+    }*/
+    inputfp = fopen((char*)file, "r");
     
     if(!inputfp) {
         fprintf(stderr,"Error Opening Input File: %s\n", (char *) file);
@@ -30,7 +30,7 @@ void *readURL(void *file){
         free(hostname);
         return NULL;
     }
-    
+    printf("%s\n", "Safe");
     // free(hostname);
     while (fscanf(inputfp, INPUTFS, hostname)>0){
         char *name = strdup(hostname);
@@ -66,12 +66,18 @@ void* resolve(void* outputFile) {
     }
     while(1){
     	char* hostname;
+    	while(queue_is_empty(&request)){
+    		
+    	}
         pthread_mutex_lock(&lock);
         hostname = (char*)queue_pop(&request);
+        /*printf("%s\n", "Help1");
         printf("%s\n", hostname);
+        printf("%s\n", "Help2");*/
         pthread_mutex_unlock(&lock);
         
-        if (hostname != NULL) {
+        if (hostname != NULL && !!strcmp(hostname, "\0")) {
+        	printf("%s\n", hostname);
             if(dnslookup(hostname, firstipstr, sizeof(firstipstr))
                == UTIL_FAILURE) {
                 fprintf(stderr, "dnslookup error: %s\n", hostname);
@@ -81,7 +87,8 @@ void* resolve(void* outputFile) {
             printf("%s\n", hostname);
             fprintf(outputfp, "%s,%s\n", hostname, firstipstr);
             pthread_mutex_unlock(&lock);
-            //free(hostname);
+            free(hostname);
+            hostname = NULL;
         }
         
     }
@@ -108,17 +115,17 @@ int main(int argc, char * argv[]){
     }
     for (long i = 0; i < numberofinputfiles; i ++){
         pthread_join(requester_threads[i], &status);
-        int* st = (int*)status;
-        if ((*st) == 2){
+        /*int* st = (int*)status;
+        if (*st == 2){
             printf("Failed to join");
-        }
+        }*/
     }
     for (long i = 0; i < 1; i ++){
         pthread_join(resolver_threads[i], &status);
-        int* st = (int*)status;
-        if ((*st) == 2){
+        /*int* st = (int*)status;
+        if (*st == 2){
             printf("It failed to join");
-        }
+        }*/
     }
     
     pthread_mutex_destroy(&lock);
@@ -127,3 +134,4 @@ int main(int argc, char * argv[]){
     printf("Main: program completed.\n");
     return 0;
 }
+
