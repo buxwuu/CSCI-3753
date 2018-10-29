@@ -12,11 +12,12 @@
 #define INPUTFS "%1024s"
 
 queue request;
-pthread_mutex_t lock;
-pthread_mutex_t finished_lock;
 int requesters_finished = 0;
 
+//pthread_mutex_t finished_lock;
+
 void *readURL(void *file){
+    pthread_mutex_t lock;
     FILE* inputfp = NULL;
     int fail;
     char* hostname = malloc(SBUFSIZE*sizeof(char)); /*https://pebble.gitbooks.io/learning-c-with-pebble/content/chapter08.html*/
@@ -59,6 +60,7 @@ void *readURL(void *file){
 }
 
 void* resolve(void* outputFile) {
+    pthread_mutex_t lock;
     char firstipstr[INET6_ADDRSTRLEN];
 
     //char* hostname = NULL;
@@ -115,6 +117,7 @@ void* resolve(void* outputFile) {
 }
 
 int main(int argc, char * argv[]){
+    pthread_mutex_t lock;
     int numberofinputfiles = argc - 2; //got this command from stack overflow//
     int RESOLVER_THREADS = sysconf(_SC_NPROCESSORS_ONLN);
     //FILE* file;
@@ -145,9 +148,9 @@ int main(int argc, char * argv[]){
          }*/
     }
     
-    pthread_mutex_lock(&finished_lock);
+    pthread_mutex_lock(&lock);
     requesters_finished = 1;
-    pthread_mutex_unlock(&finished_lock);
+    pthread_mutex_unlock(&lock);
     
     for (long i = 0; i < RESOLVER_THREADS; i ++){
         pthread_join(resolver_threads[i], &status);
