@@ -28,7 +28,7 @@ void *readURL(void *file){
     
    /* if(!inputfp) {
         fprintf(stderr,"Error Opening Input File: %s\n", (char *) file);
-        //Clean up after the failed file
+        //Clean up after the failed file, took this out
         free(hostname);
         return NULL;
     }*/
