@@ -13,6 +13,8 @@
 
 queue request;
 int requesters_finished = 0;
+pthread_cond_t cond_queue_empty = PTHREAD_COND_INITIALIZER;
+pthread_cond_t cond_queue_full = PTHREAD_COND_INITIALIZER;
 
 //pthread_mutex_t finished_lock;
 
@@ -20,7 +22,7 @@ void *readURL(void *file){
     pthread_mutex_t lock;
     FILE* inputfp = NULL;
     int fail;
-    char* hostname = malloc(SBUFSIZE*sizeof(char)); /*https://pebble.gitbooks.io/learning-c-with-pebble/content/chapter08.html*/
+    char hostname[SBUFSIZE]; /*https://pebble.gitbooks.io/learning-c-with-pebble/content/chapter08.html*/
     /*if (hostname == NULL){
      printf("Memory allocation failed.\n");
      }*/
@@ -35,23 +37,23 @@ void *readURL(void *file){
     printf("%s\n", "Safe");
     // free(hostname);
     while (fscanf(inputfp, INPUTFS, hostname)>0){
-        char *name = strdup(hostname);
+    	char* mid = malloc(SBUFSIZE);
+        mid = strncpy(mid, hostname, SBUFSIZE);
         pthread_mutex_lock(&lock);
-        fail = queue_push(&request, (void*) name);
+        fail = queue_push(&request, mid);
         pthread_mutex_unlock(&lock);
         
         
         while(fail == QUEUE_FAILURE){
             pthread_mutex_lock(&lock);
-            queue_push(&request, (void*) name);
+            fail = queue_push(&request, mid);
             pthread_mutex_unlock(&lock);
             if (fail == QUEUE_FAILURE) {
                 usleep(rand()%100);
             }
         }
+        free(mid);
     }
-
-    //free(hostname);
     fclose(inputfp);
     printf("%s\n", "End of readURL");
 
@@ -63,7 +65,7 @@ void* resolve(void* outputFile) {
     pthread_mutex_t lock;
     char firstipstr[INET6_ADDRSTRLEN];
 
-    //char* hostname = NULL;
+    char* hostname;
 
     /* Open Output File */
     FILE* outputfp = NULL;
@@ -77,43 +79,38 @@ void* resolve(void* outputFile) {
     while(1){
 
         while(!queue_is_empty(&request) || !requesters_finished){
-            char* hostname;// = malloc(SBUFSIZE*sizeof(char));
             pthread_mutex_lock(&lock);
-            hostname = (char*)queue_pop(&request);
+            hostname = queue_pop(&request);
            // pthread_mutex_unlock(&lock);
 
-        if (hostname != NULL && !!strcmp(hostname, "\0")) {
-            printf("%s\n", hostname);
-            if(dnslookup(hostname, firstipstr, sizeof(firstipstr))
-               == UTIL_FAILURE) {
-                fprintf(stderr, "dnslookup error: %s\n", hostname);
-                strncpy(firstipstr, "", sizeof(firstipstr));
-                
-            }
-           // pthread_mutex_lock(&lock);
-            printf("%s\n", hostname);
-            fprintf(outputfp, "%s,%s\n", hostname, firstipstr);
-        }
-            pthread_mutex_unlock(&lock);
-                free(hostname);//The free function causes the space pointed to by ptr to be deallocated, that is, made available for further allocation.
-                //return NULL;
-           
-            hostname = NULL;
-          //  char* hostname;
-
-           /* if(queue_is_empty == 1){
-                break;
-            }*/
-       /* else {
-            break;
-        }*/
-
-    }
+        	if (hostname != NULL) {
+            	printf("about to lookup: %s\n", hostname);
+	            if(dnslookup(hostname, firstipstr, sizeof(firstipstr))
+	               == UTIL_FAILURE) {
+	                fprintf(stderr, "dnslookup error: %s\n", hostname);
+	                strncpy(firstipstr, "", sizeof(firstipstr));
+	                
+	            }
+            	// pthread_mutex_lock(&lock);
+	            printf("print this hostname to file: %s\n", hostname);
+	            fprintf(outputfp, "%s,%s\n", hostname, firstipstr);
+		        free(hostname);//The free function causes the space pointed to by ptr to be deallocated, that is, made available for further allocation.
+		        //return NULL;
+		        hostname = NULL;
+	        }
+	        pthread_mutex_unlock(&lock);
+	        //char* hostname;
+			/* if(queue_is_empty == 1){
+	            break;
+	        }*/
+	        /*else{
+	            break;
+	        }*/
+    	}
 
         fclose(outputfp);
-        return NULL;
-}
-   
+	}
+    return NULL;
 }
 
 int main(int argc, char * argv[]){
