@@ -13,45 +13,42 @@
 
 queue request;
 int requesters_finished = 0;
+pthread_mutex_t lock;
 
 //pthread_mutex_t finished_lock;
 
 void *readURL(void *file){
-    pthread_mutex_t lock;
     FILE* inputfp = NULL;
-    int fail;
     char* hostname = malloc(SBUFSIZE*sizeof(char)); /*https://pebble.gitbooks.io/learning-c-with-pebble/content/chapter08.html*/
     /*if (hostname == NULL){
      printf("Memory allocation failed.\n");
      }*/
     inputfp = fopen((char*)file, "r");
-    
+    int done = 0;
    /* if(!inputfp) {
         fprintf(stderr,"Error Opening Input File: %s\n", (char *) file);
         //Clean up after the failed file, took this out
         free(hostname);
         return NULL;
     }*/
-    printf("%s\n", "Safe");
     // free(hostname);
     while (fscanf(inputfp, INPUTFS, hostname)>0){
-        char *name = strdup(hostname);
-        pthread_mutex_lock(&lock);
-        fail = queue_push(&request, (void*) name);
-        pthread_mutex_unlock(&lock);
-        
-        
-        while(fail == QUEUE_FAILURE){
-            pthread_mutex_lock(&lock);
-            queue_push(&request, (void*) name);
-            pthread_mutex_unlock(&lock);
-            if (fail == QUEUE_FAILURE) {
+    	while(!done){
+	    	char *name = strdup(hostname);
+	    	pthread_mutex_lock(&lock);
+	    	while (queue_is_full(&request)){
+	    		pthread_mutex_unlock(&lock);
                 usleep(rand()%100);
-            }
-        }
+	    		pthread_mutex_lock(&lock);
+	    	}
+	    	queue_push(&request, (void*) name);
+    		pthread_mutex_unlock(&lock);
+	        done = 1;
+    	}
+        done = 0;
     }
 
-    //free(hostname);
+    free(hostname);
     fclose(inputfp);
     printf("%s\n", "End of readURL");
 
@@ -60,7 +57,6 @@ void *readURL(void *file){
 }
 
 void* resolve(void* outputFile) {
-    pthread_mutex_t lock;
     char firstipstr[INET6_ADDRSTRLEN];
 
     //char* hostname = NULL;
@@ -77,47 +73,37 @@ void* resolve(void* outputFile) {
     while(1){
 
         while(!queue_is_empty(&request) || !requesters_finished){
+        	//printf("%d - %d\n", !queue_is_empty(&request), !requesters_finished);
             char* hostname;// = malloc(SBUFSIZE*sizeof(char));
             pthread_mutex_lock(&lock);
             hostname = (char*)queue_pop(&request);
-           // pthread_mutex_unlock(&lock);
-
-        if (hostname != NULL && !!strcmp(hostname, "\0")) {
-            printf("%s\n", hostname);
-            if(dnslookup(hostname, firstipstr, sizeof(firstipstr))
-               == UTIL_FAILURE) {
-                fprintf(stderr, "dnslookup error: %s\n", hostname);
-                strncpy(firstipstr, "", sizeof(firstipstr));
-                
-            }
-           // pthread_mutex_lock(&lock);
-            printf("%s\n", hostname);
-            fprintf(outputfp, "%s,%s\n", hostname, firstipstr);
-        }
+            // pthread_mutex_unlock(&lock);
+	        if (hostname != NULL) {
+	            //printf("Looking up %s\n", hostname);
+	            if(dnslookup(hostname, firstipstr, sizeof(firstipstr))
+	               == UTIL_FAILURE) {
+	                fprintf(stderr, "dnslookup error: %s\n", hostname);
+	                strncpy(firstipstr, "", sizeof(firstipstr));
+	                
+	            }
+	           // pthread_mutex_lock(&lock);
+	            fprintf(outputfp, "%s,%s\n", hostname, firstipstr);
+	            //printf("Printed %s,%s\n", hostname, firstipstr);
+	        }
             pthread_mutex_unlock(&lock);
-                free(hostname);//The free function causes the space pointed to by ptr to be deallocated, that is, made available for further allocation.
-                //return NULL;
-           
+            free(hostname);//The free function causes the space pointed to by ptr to be deallocated, that is, made available for further allocation.
+            //return NULL;
             hostname = NULL;
-          //  char* hostname;
+    	}
 
-           /* if(queue_is_empty == 1){
-                break;
-            }*/
-       /* else {
-            break;
-        }*/
-
-    }
-
-        fclose(outputfp);
-        return NULL;
-}
+	    fclose(outputfp);
+	    printf("Exiting resolver\n");
+    	return NULL;
+	}
    
 }
 
 int main(int argc, char * argv[]){
-    pthread_mutex_t lock;
     int numberofinputfiles = argc - 2; //got this command from stack overflow//
     int RESOLVER_THREADS = sysconf(_SC_NPROCESSORS_ONLN);
     //FILE* file;
@@ -142,10 +128,10 @@ int main(int argc, char * argv[]){
 
     for (long i = 0; i < numberofinputfiles; i ++){
         pthread_join(requester_threads[i], &status);
-        /*int* st = (int*)status;
-         if (*st == 2){
-         printf("Failed to join");
-         }*/
+        //int* st = (int*)status;
+        /*if (*st == 2){
+        	printf("Failed to join");
+        }*/
     }
     
     pthread_mutex_lock(&lock);
